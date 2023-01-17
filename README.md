@@ -1,5 +1,4 @@
-# 3D-Physics-Sim
-
+# Learning WebGL
 * First -> Download Node.js
 * Second -> Inside of the 3D-Physics-Sim Folder run the command:
 npm install express
