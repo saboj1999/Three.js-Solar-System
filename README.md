@@ -1,7 +1,6 @@
-# Learning WebGL
+# Three.js Solar System Simulation
 * First -> Download Node.js
-* Second -> Inside of the 3D-Physics-Sim Folder run the command:
-npm install express
-* Third -> Inside of the 3D-Physics-Sim Folder run the command:
-node server.js
-* Fourth -> Open localhost:5000 in a browser
+* Second -> Inside of the Folder run the command:
+npm install
+* Third -> Inside of the Folder run the command:
+npm run dev
