@@ -38,10 +38,12 @@ const scene = new THREE.Scene()
 const textureLoader = new THREE.TextureLoader()
 const sunTexture = textureLoader.load('/textures/sun.jpg')
 const earthTexture = textureLoader.load('/textures/earth.jpg')
+const moonTexture = textureLoader.load('/textures/moon.jpg')
 
 const radiusMod = 1.5
 let sunRadius = .95 * radiusMod
 let earthRadius = .50 * radiusMod
+let moonRadius = .20 * radiusMod
 
 /**
  * Default Planet Values for Reset
@@ -67,6 +69,17 @@ const earthDefaultObject =
     zVelocity: -29783,// * Math.cos(.8),
     mass: 5.972 * Math.pow(10, 24),
     radius: earthRadius
+}
+const moonDefaultObject = 
+{
+    xPosition: AU,
+    yPosition: 2 * Math.pow(10, 7),
+    zPosition: 3.844 * Math.pow(10, 8),
+    xVelocity: 0,
+    yVelocity: -1000,
+    zVelocity: -29783,
+    mass: 7.347 * Math.pow(10, 22),
+    radius: moonRadius
 }
 
 /**
@@ -112,6 +125,14 @@ const earthMaterial = new THREE.MeshStandardMaterial({
 const earth = new THREE.Mesh(earthGeometry, earthMaterial)
 scene.add(earth)
 
+// Earth's Moon
+const moonGeometry = new THREE.SphereGeometry(moonRadius, 16, 16)
+const moonMaterial = new THREE.MeshStandardMaterial({
+    map: moonTexture
+})
+const moon = new THREE.Mesh(moonGeometry, moonMaterial)
+scene.add(moon)
+
 /**
  * Planet Objects
  */
@@ -142,6 +163,23 @@ const earthObject =
     default: earthDefaultObject
 }
 earth.position.x = earthObject.xPosition / scaleFactor
+
+const moonObject = 
+{
+    mesh: moon,
+    xPosition: AU,
+    yPosition: 2 * Math.pow(10, 7),
+    zPosition: -3.844 * Math.pow(10, 8),
+    xVelocity: -1000,
+    yVelocity: 0,
+    zVelocity: -29783,
+    mass: 7.347 * Math.pow(10, 22),
+    radius: moonRadius,
+    default: moonDefaultObject
+}
+moon.position.x = moonObject.xPosition / scaleFactor
+moon.position.y = moonObject.yPosition / scaleFactor
+moon.position.z = moonObject.zPosition / scaleFactor
 
 /**
  * Lights
@@ -233,7 +271,8 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
  */
 const planets = [
     sunObject, 
-    earthObject
+    earthObject,
+    moonObject
 ]
 
 // Artifcially update velocities to produce more circular orbits
@@ -339,6 +378,8 @@ gui.add(parameters, 'gravitationalN')
 gui.add(axesHelper, 'visible').name('AxesHelper')
 gui.add(plane, 'visible').name('Wireframe Plane')
 
+gui.add(sun, 'visible').name('Sun Visible')
+gui.add(earth, 'visible').name('Earth Visible')
 
 /**
  * Animate
