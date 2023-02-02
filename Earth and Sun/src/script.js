@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import * as dat from 'lil-gui'
 
-const defaultScaleFactor = Math.pow(10, 10) // 10^9 is good too with use of camera views
+const defaultScaleFactor = Math.pow(10, 8) // 10^9 is good too with use of camera views
 const AU = 1.5 * Math.pow(10, 11)
 const gravitationConstant = -6.67 * Math.pow(10, -11)
 
@@ -13,9 +13,12 @@ const gravitationConstant = -6.67 * Math.pow(10, -11)
 const gui = new dat.GUI()
 const debugObject = {}
 const parameters = {
-    timeStep: 4320, // 60 -> 1 Simulation hour per 1 Actual second (4320 -> 3 days / 1 second)
+    timeStep: 1000, // 60 -> 1 Simulation hour per 1 Actual second (4320 -> 3 days / 1 second)
     scaleFactor: defaultScaleFactor,
-    gravitationalN: 0
+    gravitationalN: 0,
+    scaleWithZoom: true,
+    currentCameraMesh: null,
+    cameraLocked: false,
 }
 
 let timeStep = parameters.timeStep
@@ -39,11 +42,76 @@ const textureLoader = new THREE.TextureLoader()
 const sunTexture = textureLoader.load('/textures/sun.jpg')
 const earthTexture = textureLoader.load('/textures/earth.jpg')
 const moonTexture = textureLoader.load('/textures/moon.jpg')
+const jupiterTexture = textureLoader.load('/textures/jupiter.jpg')
 
-const radiusMod = 1.5
-let sunRadius = .95 * radiusMod
-let earthRadius = .50 * radiusMod
-let moonRadius = .20 * radiusMod
+const radiusMod = 1
+let sunRadius = 1.5 * radiusMod
+let earthRadius = .5 * radiusMod
+let moonRadius = .25 * radiusMod
+let jupiterRadius = 1.25 * radiusMod
+
+
+/**
+ * Helper Axis
+ */
+const axesHelper = new THREE.AxesHelper(25)
+scene.add(axesHelper)
+axesHelper.visible = false
+
+/**
+ * Plane
+ */
+const planeGeometry = new THREE.PlaneGeometry(500, 500, 300, 300)
+const planeMaterial = new THREE.MeshBasicMaterial(
+{
+    color:0xffffff, 
+    wireframe: true,
+    transparent: true,
+    opacity: .1
+})
+const plane = new THREE.Mesh(planeGeometry, planeMaterial)
+plane.rotation.x = - Math.PI / 2
+scene.add(plane)
+plane.visible =  false
+
+/**
+ * Planet Meshes
+ */
+// Sun
+const sunGeometry = new THREE.SphereGeometry(sunRadius, 32, 32)
+const sunMaterial = new THREE.MeshStandardMaterial({
+    map: sunTexture,
+    emissive: '#FEC829'
+})
+const sun = new THREE.Mesh(sunGeometry, sunMaterial)
+parameters.currentCameraMesh = sun
+scene.add(sun)
+
+// Earth
+const earthGeometry = new THREE.SphereGeometry(earthRadius, 32, 32)
+const earthMaterial = new THREE.MeshStandardMaterial({
+    map: earthTexture,
+})
+const earth = new THREE.Mesh(earthGeometry, earthMaterial)
+scene.add(earth)
+
+// Earth's Moon
+const moonGeometry = new THREE.SphereGeometry(moonRadius, 16, 16)
+const moonMaterial = new THREE.MeshStandardMaterial({
+    map: moonTexture
+})
+const moon = new THREE.Mesh(moonGeometry, moonMaterial)
+scene.add(moon)
+
+// Jupiter
+const jupiterGeometry = new THREE.SphereGeometry(jupiterRadius, 16, 16)
+const jupiterMaterial = new THREE.MeshStandardMaterial({
+    map: jupiterTexture
+})
+const jupiter = new THREE.Mesh(jupiterGeometry, jupiterMaterial)
+scene.add(jupiter)
+
+
 
 /**
  * Default Planet Values for Reset
@@ -81,57 +149,17 @@ const moonDefaultObject =
     mass: 7.347 * Math.pow(10, 22),
     radius: moonRadius
 }
-
-/**
- * Helper Axis
- */
-const axesHelper = new THREE.AxesHelper(25)
-scene.add(axesHelper)
-axesHelper.visible = false
-
-/**
- * Plane
- */
-const planeGeometry = new THREE.PlaneGeometry(500, 500, 300, 300)
-const planeMaterial = new THREE.MeshBasicMaterial(
+const jupiterDefaultObject = 
 {
-    color:0xffffff, 
-    wireframe: true,
-    transparent: true,
-    opacity: .1
-})
-const plane = new THREE.Mesh(planeGeometry, planeMaterial)
-plane.rotation.x = - Math.PI / 2
-scene.add(plane)
-plane.visible =  false
-
-/**
- * Planet Meshes
- */
-// Sun
-const sunGeometry = new THREE.SphereGeometry(sunRadius, 32, 32)
-const sunMaterial = new THREE.MeshStandardMaterial({
-    map: sunTexture,
-    emissive: '#FEC829'
-})
-const sun = new THREE.Mesh(sunGeometry, sunMaterial)
-scene.add(sun)
-
-// Earth
-const earthGeometry = new THREE.SphereGeometry(earthRadius, 32, 32)
-const earthMaterial = new THREE.MeshStandardMaterial({
-    map: earthTexture,
-})
-const earth = new THREE.Mesh(earthGeometry, earthMaterial)
-scene.add(earth)
-
-// Earth's Moon
-const moonGeometry = new THREE.SphereGeometry(moonRadius, 16, 16)
-const moonMaterial = new THREE.MeshStandardMaterial({
-    map: moonTexture
-})
-const moon = new THREE.Mesh(moonGeometry, moonMaterial)
-scene.add(moon)
+    xPosition: 5.2 * AU,
+    yPosition: 0,
+    zPosition: 0,
+    xVelocity: 0,
+    yVelocity: 0,
+    zVelocity: -13070,
+    mass: 1.898 * Math.pow(10, 27),
+    radius: jupiterRadius
+}
 
 /**
  * Planet Objects
@@ -163,7 +191,6 @@ const earthObject =
     default: earthDefaultObject
 }
 earth.position.x = earthObject.xPosition / scaleFactor
-
 const moonObject = 
 {
     mesh: moon,
@@ -180,6 +207,21 @@ const moonObject =
 moon.position.x = moonObject.xPosition / scaleFactor
 moon.position.y = moonObject.yPosition / scaleFactor
 moon.position.z = moonObject.zPosition / scaleFactor
+const jupiterObject = 
+{
+    mesh: jupiter,
+    xPosition: 5.2 * AU,
+    yPosition: 0,
+    zPosition: 0,
+    xVelocity: 0,
+    yVelocity: 0,
+    zVelocity: -13070,
+    mass: 1.898 * Math.pow(10, 27),
+    radius: jupiterRadius,
+    default: jupiterDefaultObject
+}
+jupiter.position.x = jupiterObject.xPosition / scaleFactor
+
 
 /**
  * Lights
@@ -246,13 +288,54 @@ window.addEventListener('keydown', (event) =>
  * Camera
  */
 // Base camera
-const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 0.1, 100)
+const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 0.1, 10000)
 camera.position.set(- 3, 3, 3)
 scene.add(camera)
 
 // Controls
 const controls = new OrbitControls(camera, canvas)
 controls.enableDamping = true
+
+
+
+// Planet Cameras
+const sunCam = () =>
+{
+    parameters.currentCameraMesh = sun
+    camera.position.set(sun.position.x + 10, sun.position.y + 10, sun.position.z + 10)
+}
+const earthCam = () =>
+{
+    parameters.currentCameraMesh = earth
+    camera.position.set(earth.position.x + 10, earth.position.y + 10, earth.position.z + 10)
+}
+const moonCam = () =>
+{
+    parameters.currentCameraMesh = moon
+    camera.position.set(moon.position.x + 10, moon.position.y + 10, moon.position.z + 10)
+}
+const jupiterCam = () =>
+{
+    parameters.currentCameraMesh = jupiter
+    camera.position.set(jupiter.position.x + 10, jupiter.position.y + 10, jupiter.position.z + 10)
+}
+sunObject.camera = sunCam
+earthObject.camera = earthCam
+moonObject.camera = moonCam
+jupiterObject.camera = jupiterCam
+
+const updateCamera = () =>
+{
+    controls.target = parameters.currentCameraMesh.position
+    if(parameters.cameraLocked)
+    {
+        camera.position.set(
+            parameters.currentCameraMesh.position.x + 10, 
+            parameters.currentCameraMesh.position.y + 10, 
+            parameters.currentCameraMesh.position.z + 10,)
+    }
+}
+
 
 /**
  * Renderer
@@ -272,32 +355,62 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 const planets = [
     sunObject, 
     earthObject,
-    moonObject
+    moonObject,
+    jupiterObject
 ]
 
-// Artifcially update velocities to produce more circular orbits
-// const velocityMod = 2.75
-// const artificalVelocityMod = () =>
-// {
-//     for(const planet of planets)
-//     {
-//         planet.xVelocity *= velocityMod
-//         planet.yVelocity *= velocityMod
-//         planet.zVelocity *= velocityMod
-//     }
-// }
-// artificalVelocityMod()
+
+/**
+ * Trails FIXME
+ */
+sunObject.hasTrail = false
+moonObject.hasTrail = false
+
+earthObject.hasTrail = false
+
+earthObject.trail = new Array(1000)
+earthObject.trailPointIndex = 0
+earthObject.trail[0] = earthObject.mesh.position.clone()
+// try populating initial trail -> seems to work
+for(var i = 0; i < earthObject.trail.length; i++)
+{
+    earthObject.trail[i] = earthObject.mesh.position.clone()
+}
+
+const updateTrails = () =>
+{
+    for(const planet of planets)
+    {
+        if(planet.hasTrail)
+        {
+            planet.trailPointIndex = (planet.trailPointIndex + 1) % planet.trail.length
+            planet.trail[planet.trailPointIndex] = planet.mesh.position.clone()
+
+            const geometry = new THREE.BufferGeometry().setFromPoints(planet.trail)
+            const material = new THREE.LineBasicMaterial({ color:0xffffff })
+            const line = new THREE.Line(geometry, material)
+            scene.add(line)
+        
+
+        }
+    }
+    
+}
+
+
+
+
+
+// Add updateRotations
 
 const updateRadii = () =>
 {
     let ratio = defaultScaleFactor/parameters.scaleFactor
-    sun.scale.setScalar(ratio * sunRadius)
-    earth.scale.setScalar(ratio * earthRadius)
+    for(const planet of planets)
+    {
+        planet.mesh.scale.setScalar(ratio * planet.radius)
+    }
 }
-
-let scaleWithZoom = true
-const zoomScale = {scaleWithZoom}
-
 const updatePlanets = () =>
 {
     timeStep = parameters.timeStep
@@ -348,25 +461,25 @@ const updatePlanets = () =>
             planetA.mesh.position.y = planetA.yPosition / scaleFactor
             planetA.mesh.position.z = planetA.zPosition / scaleFactor
         }
-        if(zoomScale.scaleWithZoom)
+        if(parameters.scaleWithZoom)
             updateRadii()
 }
 
 
 
 gui.add(parameters, 'timeStep')
-    .min(100)
-    .max(100000)
+    .min(60)
+    .max(60000)
     .step(10)
     .onChange(updatePlanets)
-    .name('Time Step')
+    .name('Sim Min / Real Sec')
 gui.add(parameters, 'scaleFactor')
     .min(defaultScaleFactor / 20)
     .max(5 * defaultScaleFactor)
     .step(10)
     .onFinishChange(updatePlanets)
     .name("Zoom")
-gui.add(zoomScale, 'scaleWithZoom').name('Scale with Zoom')
+gui.add(parameters, 'scaleWithZoom').name('Scale with Zoom')
 
 gui.add(parameters, 'gravitationalN')
     .min(-6)
@@ -380,6 +493,14 @@ gui.add(plane, 'visible').name('Wireframe Plane')
 
 gui.add(sun, 'visible').name('Sun Visible')
 gui.add(earth, 'visible').name('Earth Visible')
+
+const cameraViews = gui.addFolder('Camera Views')
+cameraViews.close()
+cameraViews.add(sunObject, 'camera').name('Sun Cam')
+cameraViews.add(earthObject, 'camera').name('Earth Cam')
+cameraViews.add(moonObject, 'camera').name('Moon Cam')
+cameraViews.add(jupiterObject, 'camera').name('Jupiter Cam')
+cameraViews.add(parameters, 'cameraLocked').name('Lock Camera')
 
 /**
  * Animate
@@ -395,6 +516,15 @@ const tick = () =>
     
     // Update Planets
     updatePlanets()
+
+    // Update Camera
+    updateCamera()
+
+    // Update Trails
+    updateTrails()
+
+    // controls.target = earth.position
+    // camera.position.set(earth.position.x + 2, earth.position.y + 2, earth.position.z + 2)
 
     // Update controls
     controls.update()
